@@ -1,4 +1,5 @@
 const GoogleAuth = require('google-auth-library');
+const User = require('../models/User');
 
 // initialize Google Auth
 let auth = new GoogleAuth;
@@ -37,17 +38,25 @@ exports.authenticateUser = async (req, res, next) => {
         return;
     }
 
-    let payload = await verifyUser(idToken, process.env.CLIENT_ID);
-    let googleUserId = payload['sub'];
+    // verify idTokan and retrieve payload
+    const payload = await verifyUser(idToken, process.env.CLIENT_ID);
+    const googleUserId = payload['sub'];
 
-    // 1. Get user from userId
-    // 2. If user not found, create one
-    // 3. If user found, add userId and _id to request
-    // 4. Do continue with the request
+    // find User by googleUserId
+    let user = await User.findOne({ googleUserId: googleUserId });
 
-    // add userId as googleId in request
-    req.googleUserId = googleUserId;
+    // If user not found, create a new user with googleUserId
+    if(!user){
+        user = await (new User({ googleUserId: googleUserId })).save();
+    }
+
+    user.email = payload['email'];
+    user.name = payload['name'];
+    user.picture = payload['picture'];
+
+    // add user to request
+    req.user = user;
+
     // continue
     next();
-
 };
